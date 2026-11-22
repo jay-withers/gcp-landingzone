@@ -1,7 +1,7 @@
 # Not secret: none of these grant anything on their own. Every one is tied to
 # this organization and billing account (tenant literals).
 
-org_id          = "REPLACE_WITH_ORG_ID"
+org_id          = "668995077740"
 billing_account = "01B172-6360A2-5D15E2"
 
 region            = "europe-west1"

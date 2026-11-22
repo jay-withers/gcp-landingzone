@@ -38,8 +38,6 @@ override_resource {
 }
 
 variables {
-  # A real ID is needed for validation only; nothing is called.
-  org_id = "123456789012"
   # Imports cannot run against a mocked provider.
   org_policies_to_adopt = []
 }
@@ -72,7 +70,7 @@ run "projects" {
   command = plan
 
   assert {
-    condition     = google_project.this["platform"].org_id == "123456789012" && google_project.this["platform"].folder_id == null
+    condition     = google_project.this["platform"].org_id == "668995077740" && google_project.this["platform"].folder_id == null
     error_message = "The platform project sits at the organization root."
   }
 
