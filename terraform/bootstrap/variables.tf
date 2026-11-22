@@ -70,6 +70,15 @@ variable "org_policies_to_adopt" {
   type        = set(string)
   description = "Constraints already set on the organization when bootstrap first runs (Google sets several on every new organization), imported rather than created. Check with `gcloud org-policies list --organization=<org_id>`. Empty after the first apply has adopted them."
   default     = []
+
+  validation {
+    # Caught here rather than as "import target does not exist" midway
+    # through the first apply: each entry must be a constraint bootstrap
+    # manages, under the exact name the organization shows (iam.managed.* or
+    # legacy).
+    condition     = alltrue([for c in var.org_policies_to_adopt : contains(keys(local.org_policies), c)])
+    error_message = "Every entry in org_policies_to_adopt must be a constraint in local.org_policies (locals.tf)."
+  }
 }
 
 variable "github_owner_id" {

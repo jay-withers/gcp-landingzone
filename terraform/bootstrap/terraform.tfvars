@@ -49,15 +49,16 @@ projects = {
 # front door.
 public_invoker_projects = ["health"]
 
-# Set by Google on the new organization, so the first apply imports them.
-# Confirm against `gcloud org-policies list --organization=<org_id>` first,
-# then empty this after that apply.
+# Set by Google on the new organization, so the first apply imports them:
+# the ones bootstrap manages out of `gcloud org-policies list` on 2026-11-22.
+# Google also set essentialcontacts.managed.allowedContactDomains and
+# compute.managed.restrictProtocolForwardingCreationForTypes, which bootstrap
+# leaves alone. Empty this after that apply.
 org_policies_to_adopt = [
   "iam.allowedPolicyMemberDomains",
   "iam.automaticIamGrantsForDefaultServiceAccounts",
-  "iam.disableServiceAccountKeyCreation",
   "iam.disableServiceAccountKeyUpload",
-  "storage.publicAccessPrevention",
+  "iam.managed.disableServiceAccountKeyCreation",
   "storage.uniformBucketLevelAccess",
 ]
 

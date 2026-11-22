@@ -1,6 +1,6 @@
 # How GitHub Actions signs in to GCP: a GitHub token is exchanged for
 # short-lived Google credentials, so no service account key exists anywhere
-# (and iam.disableServiceAccountKeyCreation means none can).
+# (and iam.managed.disableServiceAccountKeyCreation means none can).
 #
 # One pool for the estate. Which repo and environment may act as which service
 # account is decided by each service account's own workloadIdentityUser
