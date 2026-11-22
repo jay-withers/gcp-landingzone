@@ -1,0 +1,14 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["github>jay-withers/renovate"],
+  "autoApprove": true,
+  "regexManagers": [
+    {
+      "fileMatch": ["(^|/)\\.tflint\\.hcl$"],
+      "matchStrings": [
+        "plugin \"azurerm\" \\{[^}]*version\\s*=\\s*\"(?<currentValue>[^\"]+)\"[^}]*source\\s*=\\s*\"github\\.com/(?<depName>[^\"]+)\""
+      ],
+      "datasourceTemplate": "github-releases"
+    }
+  ]
+}
