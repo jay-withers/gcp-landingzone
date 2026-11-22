@@ -6,7 +6,7 @@
     {
       "fileMatch": ["(^|/)\\.tflint\\.hcl$"],
       "matchStrings": [
-        "plugin \"azurerm\" \\{[^}]*version\\s*=\\s*\"(?<currentValue>[^\"]+)\"[^}]*source\\s*=\\s*\"github\\.com/(?<depName>[^\"]+)\""
+        "plugin \"google\" \\{[^}]*version\\s*=\\s*\"(?<currentValue>[^\"]+)\"[^}]*source\\s*=\\s*\"github\\.com/(?<depName>[^\"]+)\""
       ],
       "datasourceTemplate": "github-releases"
     }
