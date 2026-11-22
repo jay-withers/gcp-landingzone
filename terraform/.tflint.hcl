@@ -7,8 +7,8 @@ plugin "terraform" {
   preset  = "recommended"
 }
 
-plugin "azurerm" {
+plugin "google" {
   enabled = true
-  version = "0.33.0"
-  source  = "github.com/terraform-linters/tflint-ruleset-azurerm"
+  version = "0.41.0"
+  source  = "github.com/terraform-linters/tflint-ruleset-google"
 }

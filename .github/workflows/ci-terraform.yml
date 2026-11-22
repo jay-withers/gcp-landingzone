@@ -1,5 +1,13 @@
 name: ci-terraform
 
+# Credential-free init, validate and `terraform test` (mocked google provider)
+# of every component, through the shared workflow, which owns the path filter
+# and the always-reporting gate that becomes "terraform / Terraform".
+#
+# No credentialled plan on pull requests, deliberately, as in
+# azure-landingzone: the only identity that can read everything these
+# components manage is the apply identity, and branch code never gets it (its
+# binding trusts the main-only `apply` environment alone).
 on:
   pull_request:
     branches: [main]
@@ -8,22 +16,13 @@ permissions:
   contents: read
 
 jobs:
-  # Credential-free validation via the shared workflow: the module and its
-  # example both init and validate, and the module's terraform tests run with a
-  # mocked azurerm provider, so this is green on a fresh template with no Azure
-  # auth configured. The path filter and the always-reporting gate job both
-  # live in there — mark "terraform / Terraform" as the required check in the
-  # ruleset, not the bare job id.
-  #
-  # There is no plan job: the template ships no credentials, and a plan of the
-  # example would need a real subscription. Downstream repos plan by hand.
+  # pull-requests: read is what the shared workflow's path filter needs; the
+  # filter runs inside that workflow, so the permission is granted from here.
   terraform:
     permissions:
       contents: read
       pull-requests: read
-    # TODO: re-pin to the released tag's SHA once jay-withers/workflows has cut
-    # a release containing the validate-only terraform.yml.
-    uses: jay-withers/workflows/.github/workflows/terraform.yml@801fec3f77ffca7b2124bd0aa24be37b60bda7ac # v1.28.4
+    uses: jay-withers/workflows/.github/workflows/terraform.yml@ed119fa2b4c554074ef189cc6d16696a41a833b6 # v1.31.2
     with:
-      directories: '["terraform", "terraform/examples/basic"]'
-      test-directories: '["terraform"]'
+      directories: '["terraform/bootstrap"]'
+      test-directories: '["terraform/bootstrap"]'
