@@ -24,8 +24,11 @@ locals {
     {
       for c in [
         # Workload Identity Federation is the only way in from CI, so no
-        # service account ever needs a key that could leak.
-        "iam.disableServiceAccountKeyCreation",
+        # service account ever needs a key that could leak. Creation is the
+        # managed constraint, which Google enforces on new organizations in
+        # place of iam.disableServiceAccountKeyCreation; managing both would
+        # be two policies for one rule.
+        "iam.managed.disableServiceAccountKeyCreation",
         "iam.disableServiceAccountKeyUpload",
         # Otherwise a new project's default compute and App Engine service
         # accounts get Editor on the whole project.

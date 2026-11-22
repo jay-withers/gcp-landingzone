@@ -38,6 +38,10 @@ destroy deleting the state it runs from. Every name is a literal in
   Creating one that exists fails, so the first apply imports them: list them
   in `org_policies_to_adopt`, from
   `gcloud org-policies list --organization=<org id>`.
+- **Some of those are managed constraints (`iam.managed.*`), not the legacy
+  ones with the same rule.** Manage the name the list shows. Adding the
+  legacy constraint beside a managed one creates a second policy for one
+  rule rather than adopting the first.
 - **Personal credentials need a quota project, and nothing exists to be
   one.** Org Policy, Billing Budgets, IAM and Service Usage refuse calls from
   application default credentials that name none. So the platform project is
@@ -57,7 +61,7 @@ destroy deleting the state it runs from. Every name is a literal in
 
 | Name | Version |
 | ---- | ------- |
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.7 |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9 |
 | <a name="requirement_google"></a> [google](#requirement\_google) | ~> 8.0 |
 
 ## Providers

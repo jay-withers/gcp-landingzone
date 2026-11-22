@@ -50,9 +50,11 @@ run "guardrails" {
     error_message = "Resources must be confined to europe-west1."
   }
 
+  # Google enforces the managed constraint on new organizations; managing the
+  # legacy one as well would mean two policies for one rule.
   assert {
-    condition     = google_org_policy_policy.org["iam.disableServiceAccountKeyCreation"].spec[0].rules[0].enforce == "TRUE"
-    error_message = "Service account keys must be forbidden."
+    condition     = google_org_policy_policy.org["iam.managed.disableServiceAccountKeyCreation"].spec[0].rules[0].enforce == "TRUE"
+    error_message = "Service account keys must be forbidden, through the managed constraint."
   }
 
   assert {
@@ -123,4 +125,16 @@ run "state_consumers" {
     condition     = endswith(google_storage_bucket_iam_member.consumer_state["health"].member, "/subject/repo:jay-withers@288264678/health@1377247331:environment:dev")
     error_message = "health's state grant names its dev environment's subject."
   }
+}
+
+# A legacy name for a constraint the organization holds as a managed one is
+# refused at plan, before any import is attempted.
+run "adopt_unmanaged_constraint" {
+  command = plan
+
+  variables {
+    org_policies_to_adopt = ["iam.disableServiceAccountKeyCreation"]
+  }
+
+  expect_failures = [var.org_policies_to_adopt]
 }

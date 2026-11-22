@@ -1,7 +1,7 @@
 terraform {
-  # 1.7: `for_each` on import blocks (main.policy.tf adopts the org policies
-  # Google sets on a new organization) and mock_resource in the tests.
-  required_version = ">= 1.7"
+  # 1.9: org_policies_to_adopt's validation refers to a local. (1.7 brought
+  # `for_each` on import blocks and mock_resource in the tests.)
+  required_version = ">= 1.9"
 
   required_providers {
     google = {
