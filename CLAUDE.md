@@ -40,18 +40,20 @@ the why and the first apply.
   organization applies with a gitignored `backend_override.tf` forcing local
   state, then `terraform init -migrate-state`.
 - **The pipeline identity never gets organization-level roles.** Org policy,
-  folders, projects and billing stay with a person. Its grants stop at the
-  `apps` folder, each app project (only for roles GCP refuses on a folder,
-  such as `roles/iam.roleAdmin`), the platform project, and its own
-  `gcp-landingzone/` state prefix. It holds no right over the bucket or its
-  IAM. A new grant for it is a decision for the user, not a fix for a
-  permission error.
+  folders, projects and billing stay with a person. It can read the `apps`
+  folder, run the platform project's Artifact Registry, and write its own
+  `gcp-landingzone/` state prefix: nothing that creates, binds or grants to
+  an identity, so no CI apply can reach an app's deploy identity or state.
+  A new grant for it is a decision for the user, not a fix for a permission
+  error.
 - **Each app's deploy identity is here too** (`apps`, `main.apps.tf`), not in
   a pipeline-applied component: it's privileged, and it holds the app's
   state prefix. A service account (not the bare GitHub principal) because a
   Cloud Run domain mapping's creator must be a Search Console owner, and only
   an email can be one. Its roles (`local.app_deploy_roles`) stop at its own
-  project and never include owner, editor or project IAM admin.
+  project and never include owner, editor, project IAM admin or
+  `serviceAccountAdmin`: its runtime accounts come from a custom role without
+  `setIamPolicy`, so it can't widen any account's trust, its own included.
 - **Stores of record are protected by an IAM deny policy, not a role gap.**
   `no-bucket-delete` on every app project denies `buckets.delete` to
   everyone, owners included, so an identity that can grant itself

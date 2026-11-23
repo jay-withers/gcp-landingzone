@@ -29,6 +29,43 @@ resource "google_service_account_iam_member" "app_deploy_federation" {
   member             = "principal://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/subject/${each.value.subject}"
 }
 
+# Manages the app's runtime service accounts without setIamPolicy, which
+# roles/iam.serviceAccountAdmin would include: with it, the deploy identity
+# could bind any GitHub subject to itself and step round its environment's
+# main-only rules. Granting roles to an account happens on the resource
+# (a bucket, a secret, a job), never on the account.
+resource "google_project_iam_custom_role" "app_service_accounts" {
+  provider = google.platform
+  for_each = local.app_projects
+
+  project     = google_project.this[each.key].project_id
+  role_id     = "appServiceAccountManager"
+  title       = "App service account manager"
+  description = "Create, update and delete the app's service accounts; never their IAM policy"
+  permissions = [
+    "iam.serviceAccounts.create",
+    "iam.serviceAccounts.delete",
+    "iam.serviceAccounts.disable",
+    "iam.serviceAccounts.enable",
+    "iam.serviceAccounts.get",
+    "iam.serviceAccounts.getIamPolicy",
+    "iam.serviceAccounts.list",
+    "iam.serviceAccounts.undelete",
+    "iam.serviceAccounts.update",
+  ]
+
+  depends_on = [google_project_service.this]
+}
+
+resource "google_project_iam_member" "app_deploy_service_accounts" {
+  provider = google.platform
+  for_each = var.apps
+
+  project = google_project.this[each.value.project].project_id
+  role    = google_project_iam_custom_role.app_service_accounts[each.value.project].name
+  member  = google_service_account.app_deploy[each.key].member
+}
+
 resource "google_project_iam_member" "app_deploy" {
   provider = google.platform
   for_each = local.app_deploy_grants

@@ -4,8 +4,8 @@
 #
 # One pool for the estate. Which repo and environment may act as which service
 # account is decided by each service account's own workloadIdentityUser
-# binding, on the token's full subject: this repo's below, each app's in
-# foundation.
+# binding, on the token's full subject: this repo's in main.pipeline.tf, each
+# app's in main.apps.tf.
 #
 # A deleted pool or provider holds its ID for 30 days, so renaming either is a
 # month's wait, not an apply.

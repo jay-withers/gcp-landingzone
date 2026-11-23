@@ -118,21 +118,17 @@ run "pipeline" {
     error_message = "The pipeline identity must not be able to own or create projects."
   }
 
-  # Custom roles live in projects and organizations, so GCP refuses
-  # roles/iam.roleAdmin on a folder (400 "not supported for this resource").
+  # App deploy identities and their trust are bootstrap's, applied by a
+  # person: the pipeline must hold nothing that creates, binds or grants to
+  # an identity, or a foundation change could reach an app's state.
   assert {
-    condition     = !contains(keys(google_folder_iam_member.pipeline), "roles/iam.roleAdmin")
-    error_message = "roles/iam.roleAdmin cannot be granted on a folder."
-  }
-
-  assert {
-    condition     = google_project_iam_member.pipeline_apps["health/roles/iam.roleAdmin"].project == "jaywithers-health-dev"
-    error_message = "The pipeline needs roles/iam.roleAdmin on each app project, for foundation's custom roles there."
-  }
-
-  assert {
-    condition     = !contains(keys(google_project_iam_member.pipeline_apps), "platform/roles/iam.roleAdmin")
-    error_message = "Only app projects get the per-project roles."
+    condition = length(setintersection(keys(google_folder_iam_member.pipeline), [
+      "roles/iam.serviceAccountAdmin",
+      "roles/iam.roleAdmin",
+      "roles/resourcemanager.projectIamAdmin",
+      "roles/iam.securityAdmin",
+    ])) == 0
+    error_message = "The pipeline identity must not be able to create, bind or grant to identities in the apps folder."
   }
 
   assert {
@@ -170,8 +166,13 @@ run "apps" {
   }
 
   assert {
-    condition     = !anytrue([for k, g in google_project_iam_member.app_deploy : contains(["roles/owner", "roles/editor", "roles/resourcemanager.projectIamAdmin"], g.role)])
-    error_message = "An app's deploy identity never holds owner, editor or project IAM admin."
+    condition     = !anytrue([for k, g in google_project_iam_member.app_deploy : contains(["roles/owner", "roles/editor", "roles/resourcemanager.projectIamAdmin", "roles/iam.serviceAccountAdmin", "roles/iam.securityAdmin"], g.role)])
+    error_message = "An app's deploy identity never holds owner, editor, project IAM admin, or anything that sets a service account's IAM."
+  }
+
+  assert {
+    condition     = !contains(google_project_iam_custom_role.app_service_accounts["health"].permissions, "iam.serviceAccounts.setIamPolicy")
+    error_message = "The deploy identity must not be able to change any service account's trust, its own included."
   }
 
   assert {

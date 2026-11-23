@@ -133,8 +133,8 @@ variable "apps" {
   }
 
   validation {
-    condition     = alltrue([for a in values(var.apps) : contains(keys(var.projects), a.project) && a.project != "platform"])
-    error_message = "Each app's project must be an app project in var.projects (not platform)."
+    condition     = alltrue([for a in values(var.apps) : contains(keys(var.projects), a.project) ? var.projects[a.project].in_apps_folder : false])
+    error_message = "Each app's project must be a project in var.projects inside the apps folder."
   }
 
   validation {

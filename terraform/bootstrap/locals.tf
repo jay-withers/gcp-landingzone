@@ -55,40 +55,28 @@ locals {
     },
   )
 
-  # What the pipeline identity may do, and where. Enough for foundation to
-  # create each app's deploy identity and grants and the Artifact Registry
-  # proxy; nothing on the organization, so org policy, folders, projects and
-  # billing stay with whoever applies bootstrap by hand.
+  # What the pipeline identity may do, and where: read the app projects (their
+  # numbers, for Cloud Run's service agents) and run foundation's Artifact
+  # Registry proxy, including its reader grants. Nothing that can create, bind
+  # or grant to an identity: app deploy identities and their roles are
+  # bootstrap's (main.apps.tf), so nothing CI applies can reach an app's
+  # identity or its state.
   pipeline_folder_roles = toset([
     "roles/browser",
-    "roles/iam.serviceAccountAdmin",
-    "roles/resourcemanager.projectIamAdmin",
     "roles/serviceusage.serviceUsageConsumer",
   ])
-
-  # Roles GCP will not take on a folder, granted on each app project instead.
-  # roles/iam.roleAdmin: custom roles live in projects (and organizations),
-  # never folders, and foundation creates one per app (storage without
-  # bucket delete).
-  pipeline_app_project_roles = merge([
-    for key, p in var.projects : {
-      for role in ["roles/iam.roleAdmin"] : "${key}/${role}" => {
-        project = key
-        role    = role
-      }
-    } if p.in_apps_folder
-  ]...)
 
   # What each app's deploy identity holds on its own project: enough for its
   # Terraform (Cloud Run service and jobs, Scheduler, secret containers, its
   # runtime service accounts, the store-of-record bucket, alert policies and
   # log metrics) and its `make deploy`. Nothing outside the project, and no
-  # project-level IAM: its grants are on its own resources. Bucket deletion
-  # is denied regardless (main.apps.tf).
+  # project-level IAM: its grants are on its own resources. Its runtime
+  # service accounts come from the custom role in main.apps.tf, which has no
+  # setIamPolicy, so it can't re-bind any account's trust, its own included.
+  # Bucket deletion is denied regardless (main.apps.tf).
   app_deploy_roles = [
     "roles/browser",
     "roles/cloudscheduler.admin",
-    "roles/iam.serviceAccountAdmin",
     "roles/iam.serviceAccountUser",
     "roles/logging.configWriter",
     "roles/monitoring.editor",
