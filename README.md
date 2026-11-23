@@ -47,21 +47,62 @@ There is no credit, unlike Azure's $150, so the budget (5 a month, in the
 billing account's currency) emails at 50%, at 100%, and when the month is
 forecast to pass 100%.
 
-## First apply (by hand)
+## Manual steps
 
-You need:
-- an organization administrator on jaywithers.uk, who also holds Organization
-  Policy Administrator on the organization
-- Billing Account Administrator on the billing account, since creating the
-  budget needs more than Billing Account User
-- the Google Cloud CLI
+Everything below is done by a person, once, in this order. It's the runbook
+for doing it again, and the record of how the current organization was set up
+on 2026-11-22 and 23. Nothing here is automated, because each step either
+creates the identity automation would run as or needs rights no pipeline
+holds.
 
-Personal credentials need a quota project, and the platform project is the
-only sensible one, so create it with gcloud first. Bootstrap then adopts it.
+### 1. The organization
+
+GCP organizations come from a Cloud Identity directory. A personal Gmail
+account has none, and without an organization there is no org policy.
+
+1. Sign up for **Cloud Identity Free** at
+   <https://workspace.google.com/gcpidentity/signup> with `jaywithers.uk`.
+   This creates an admin user on the domain.
+2. Verify the domain with the `google-site-verification=…` TXT record on the
+   apex that the sign-up shows. The same record also verifies the domain
+   for Search Console, which Cloud Run domain mappings need later.
+3. Note the organization ID (`gcloud organizations list`; here
+   `668995077740`) and the billing account (here `01B172-6360A2-5D15E2`).
+   Both go in `terraform/bootstrap/terraform.tfvars` as `org_id` and
+   `billing_account`, along with the other tenant-bound literals there:
+   project IDs, the bucket name, and the GitHub IDs.
+
+### 2. Roles for whoever applies bootstrap
+
+Organization Administrator manages IAM on the organization, but doesn't
+include creating folders or setting org policy. (Here this step came after a
+first apply failed on the folder: Project Creator was already held through
+the domain-wide default grant every new organization has.)
 
 ```bash
-ORG=<org id>
 gcloud auth login
+ORG=668995077740
+ME=$(gcloud config get-value account)
+for role in roles/resourcemanager.folderAdmin \
+            roles/resourcemanager.projectCreator \
+            roles/orgpolicy.policyAdmin; do
+  gcloud organizations add-iam-policy-binding "$ORG" \
+    --member="user:$ME" --role="$role" --condition=None
+done
+# The budget needs more than Billing Account User. Run as whichever account
+# owns the billing account.
+gcloud billing accounts add-iam-policy-binding 01B172-6360A2-5D15E2 \
+  --member="user:$ME" --role=roles/billing.admin
+```
+
+### 3. The platform project and a quota project
+
+Personal credentials need a quota project before Terraform can plan anything,
+and none exists yet. So the platform project is created with gcloud, and
+bootstrap imports it.
+
+```bash
+ORG=668995077740
 gcloud projects create jaywithers-platform --organization="$ORG" --name=platform
 gcloud billing projects link jaywithers-platform --billing-account=01B172-6360A2-5D15E2
 gcloud services enable --project=jaywithers-platform \
@@ -70,16 +111,38 @@ gcloud services enable --project=jaywithers-platform \
   billingbudgets.googleapis.com iam.googleapis.com storage.googleapis.com
 gcloud auth application-default login
 gcloud auth application-default set-quota-project jaywithers-platform
+```
 
-# What Google already set on the new organization: these go in
-# org_policies_to_adopt, and the org id goes in org_id
-# (terraform/bootstrap/terraform.tfvars).
-gcloud org-policies list --organization="$ORG"
+### 4. The policies Google already set
 
+```bash
+gcloud org-policies list --organization=668995077740
+```
+
+Every constraint bootstrap manages that appears there goes in
+`org_policies_to_adopt` in `terraform/bootstrap/terraform.tfvars`, under the
+exact name listed. Some are managed constraints (`iam.managed.*`). A name
+bootstrap doesn't manage fails validation at plan time.
+
+### 5. Apply bootstrap, from a clone of your own
+
+Bootstrap's state is local, so apply it from a clone you keep, not from
+factory's `repos/` mirror:
+
+```bash
+git clone https://github.com/jay-withers/gcp-landingzone.git ~/git/gcp-landingzone
+cd ~/git/gcp-landingzone
 make apply C=bootstrap
 ```
 
-Then empty `org_policies_to_adopt`, since those policies are in state now. A
+Keep a copy of `terraform/bootstrap/terraform.tfstate` outside the machine,
+and refresh it after every bootstrap apply. Every name in it is
+deterministic, so a lost copy means `terraform import`, but a copy saves
+that.
+
+### 6. After the first apply
+
+Empty `org_policies_to_adopt` (those policies are in state now) in a PR. A
 second `make plan C=bootstrap` should show no changes.
 
 ## Commands

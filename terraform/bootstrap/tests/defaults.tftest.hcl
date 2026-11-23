@@ -107,6 +107,23 @@ run "pipeline" {
     error_message = "The pipeline identity must not be able to own or create projects."
   }
 
+  # Custom roles live in projects and organizations, so GCP refuses
+  # roles/iam.roleAdmin on a folder (400 "not supported for this resource").
+  assert {
+    condition     = !contains(keys(google_folder_iam_member.pipeline), "roles/iam.roleAdmin")
+    error_message = "roles/iam.roleAdmin cannot be granted on a folder."
+  }
+
+  assert {
+    condition     = google_project_iam_member.pipeline_apps["health/roles/iam.roleAdmin"].project == "jaywithers-health-dev"
+    error_message = "The pipeline needs roles/iam.roleAdmin on each app project, for foundation's custom roles there."
+  }
+
+  assert {
+    condition     = !contains(keys(google_project_iam_member.pipeline_apps), "platform/roles/iam.roleAdmin")
+    error_message = "Only app projects get the per-project roles."
+  }
+
   assert {
     condition     = google_storage_bucket_iam_member.pipeline_state.condition[0].expression == "resource.name.startsWith(\"projects/_/buckets/jaywithers-tfstate/objects/gcp-landingzone/\")"
     error_message = "The pipeline identity reaches its own state prefix only."
