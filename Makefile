@@ -1,6 +1,6 @@
-# Apply order, and nothing enforces it. bootstrap first: it holds everyone
-# else's state (keeping its own locally), the identity pool and the pipeline
-# identity. Later components are listed after it as they arrive.
+# Apply order, and nothing enforces it. bootstrap first: it creates the state
+# bucket everyone's state is in (its own under bootstrap/), the identity pool
+# and the pipeline identity. Later components are listed after it as they arrive.
 COMPONENTS := bootstrap
 
 # Component selector. Every terraform target needs it (test excepted, see below):

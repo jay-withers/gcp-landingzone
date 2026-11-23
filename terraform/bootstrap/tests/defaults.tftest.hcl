@@ -155,3 +155,18 @@ run "adopt_unmanaged_constraint" {
 
   expect_failures = [var.org_policies_to_adopt]
 }
+
+# bootstrap/ is bootstrap's own state: no app pipeline may be granted it.
+run "bootstrap_prefix_is_reserved" {
+  command = plan
+
+  variables {
+    state_consumers = {
+      bootstrap = {
+        subject = "repo:jay-withers@288264678/some-repo@1:environment:dev"
+      }
+    }
+  }
+
+  expect_failures = [var.state_consumers]
+}

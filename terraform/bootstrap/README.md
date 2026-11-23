@@ -27,9 +27,19 @@ exists, and no pipeline can sign in until its identity pool does.
   the platform project and the state bucket.
 - **Budget** (`main.budget.tf`).
 
-Its own state is **local**: it cannot live in the bucket it creates without a
-destroy deleting the state it runs from. Every name is a literal in
-`terraform.tfvars`, so lost state is recovered with `terraform import`.
+Its own state is in the bucket it creates, under `bootstrap/`, where the
+pipeline identity's prefix grant doesn't reach. The bucket's `prevent_destroy`
+and 30-day soft delete stand in for azure-landingzone's choice of local state.
+A fresh organization applies locally first, then migrates (the README's
+"Manual steps"). Every name is a literal in `terraform.tfvars`, so even lost
+state is recovered with `terraform import`.
+
+**If a bootstrap apply ever cuts off your access to the bucket** (an org
+policy or IAM change gone wrong), bootstrap can't read the state it needs to
+undo it. Fix the access by hand first (`gcloud storage buckets
+add-iam-policy-binding`, or `gcloud org-policies` for the policy), then plan
+again. A state write that went wrong is recoverable from the bucket's object
+versions (`gcloud storage ls -a gs://jaywithers-tfstate/bootstrap/`).
 
 ## Traps
 
@@ -114,7 +124,7 @@ No modules.
 | <a name="input_projects"></a> [projects](#input\_projects) | Projects, keyed by a short name other components use. `platform` is<br/>required: it holds the state bucket, the identity pool, the pipeline<br/>identity and (later) the Artifact Registry proxy. One project per app,<br/>the GCP counterpart of a resource group per app.<br/><br/>`project_id` is global and permanent: a deleted project holds its ID for<br/>30 days and it can never be reused after that. | <pre>map(object({<br/>    project_id = string<br/>    name       = string<br/>    # Under the `apps` folder, where the pipeline identity's grants stop.<br/>    # Only the platform project sits at the organization root.<br/>    in_apps_folder = optional(bool, true)<br/>    services       = list(string)<br/>  }))</pre> | n/a | yes |
 | <a name="input_public_invoker_projects"></a> [public\_invoker\_projects](#input\_public\_invoker\_projects) | Keys of projects exempt from iam.allowedPolicyMemberDomains, so a Cloud Run service there can grant allUsers the invoker role. health's passcode gate is its front door, not IAM. | `set(string)` | `[]` | no |
 | <a name="input_region"></a> [region](#input\_region) | The one region anything is created in. europe-west1 because Cloud Run domain mappings exist there and not in europe-west2. | `string` | `"europe-west1"` | no |
-| <a name="input_state_bucket_name"></a> [state\_bucket\_name](#input\_state\_bucket\_name) | The Terraform state bucket. Bucket names are global. | `string` | n/a | yes |
+| <a name="input_state_bucket_name"></a> [state\_bucket\_name](#input\_state\_bucket\_name) | The Terraform state bucket. Bucket names are global. Also written as a literal in versions.tf's backend block, which can't read variables: change both together. | `string` | n/a | yes |
 | <a name="input_state_consumers"></a> [state\_consumers](#input\_state\_consumers) | Repos that keep Terraform state in the bucket, keyed by the prefix their<br/>backend uses (`prefix = "<key>/<env>"`). `subject` is the GitHub<br/>environment their pipeline plans and applies in, immutable form:<br/>`repo:jay-withers@<owner id>/<repo>@<repo id>:environment:<env>`. | <pre>map(object({<br/>    subject = string<br/>  }))</pre> | `{}` | no |
 
 ## Outputs
