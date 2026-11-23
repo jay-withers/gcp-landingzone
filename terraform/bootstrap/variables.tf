@@ -102,26 +102,45 @@ variable "pipeline_identity" {
   }
 }
 
-variable "state_consumers" {
+variable "apps" {
   type = map(object({
+    project = string
     subject = string
   }))
   description = <<-DESCRIPTION
-    Repos that keep Terraform state in the bucket, keyed by the prefix their
-    backend uses (`prefix = "<key>/<env>"`). `subject` is the GitHub
-    environment their pipeline plans and applies in, immutable form:
+    Each app deployed from its own repo's pipeline, keyed by the app's name,
+    which is also its state prefix (`prefix = "<key>/<env>"` in its gcs
+    backend). `project` is its key in var.projects (an app project, in the
+    apps folder). `subject` is the GitHub environment its pipeline plans,
+    applies and deploys in, immutable form:
     `repo:jay-withers@<owner id>/<repo>@<repo id>:environment:<env>`.
+
+    Each gets a `<key>-deploy` service account in its project, federated to
+    that subject alone, holding local.app_deploy_roles on the project and its
+    state prefix; and its project gets the deny policy against bucket
+    deletion (main.apps.tf).
   DESCRIPTION
   default     = {}
 
   validation {
-    condition     = alltrue([for c in values(var.state_consumers) : can(regex("^repo:[^/]+@[0-9]+/[^/]+@[0-9]+:environment:[^:]+$", c.subject))])
+    condition     = alltrue([for a in values(var.apps) : can(regex("^repo:[^/]+@[0-9]+/[^/]+@[0-9]+:environment:[^:]+$", a.subject))])
     error_message = "Each subject must be the immutable repo:<owner>@<id>/<repo>@<id>:environment:<env> form."
   }
 
   validation {
-    condition     = length(setintersection(keys(var.state_consumers), ["gcp-landingzone", "bootstrap"])) == 0
+    condition     = length(setintersection(keys(var.apps), ["gcp-landingzone", "bootstrap"])) == 0
     error_message = "gcp-landingzone/ is its apply identity's prefix (main.pipeline.tf), and bootstrap/ is bootstrap's own state, which only a person may reach."
+  }
+
+  validation {
+    condition     = alltrue([for a in values(var.apps) : contains(keys(var.projects), a.project) && a.project != "platform"])
+    error_message = "Each app's project must be an app project in var.projects (not platform)."
+  }
+
+  validation {
+    # account_id is 6-30 characters: `<key>-deploy`.
+    condition     = alltrue([for k in keys(var.apps) : can(regex("^[a-z][a-z0-9-]{0,22}$", k))])
+    error_message = "App keys are lowercase, start with a letter, and are at most 23 characters, so `<key>-deploy` is a valid service account ID."
   }
 }
 

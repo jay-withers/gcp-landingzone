@@ -79,6 +79,38 @@ locals {
     } if p.in_apps_folder
   ]...)
 
+  # What each app's deploy identity holds on its own project: enough for its
+  # Terraform (Cloud Run service and jobs, Scheduler, secret containers, its
+  # runtime service accounts, the store-of-record bucket, alert policies and
+  # log metrics) and its `make deploy`. Nothing outside the project, and no
+  # project-level IAM: its grants are on its own resources. Bucket deletion
+  # is denied regardless (main.apps.tf).
+  app_deploy_roles = [
+    "roles/browser",
+    "roles/cloudscheduler.admin",
+    "roles/iam.serviceAccountAdmin",
+    "roles/iam.serviceAccountUser",
+    "roles/logging.configWriter",
+    "roles/monitoring.editor",
+    "roles/run.admin",
+    "roles/secretmanager.admin",
+    "roles/serviceusage.serviceUsageConsumer",
+    "roles/storage.admin",
+  ]
+
+  # One entry per app and role, keyed "<app>/<role>".
+  app_deploy_grants = merge([
+    for key, a in var.apps : {
+      for role in local.app_deploy_roles : "${key}/${role}" => {
+        app  = key
+        role = role
+      }
+    }
+  ]...)
+
+  # The projects that hold an app, for the deny policy.
+  app_projects = toset([for a in values(var.apps) : a.project])
+
   pipeline_platform_roles = toset([
     "roles/artifactregistry.admin",
     "roles/browser",

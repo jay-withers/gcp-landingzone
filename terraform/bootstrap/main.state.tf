@@ -46,17 +46,16 @@ resource "google_storage_bucket" "tfstate" {
   depends_on = [google_project_service.this]
 }
 
-# Each app's pipeline reaches its own prefix and nothing else. Granted to the
-# GitHub environment's identity directly (Workload Identity Federation with no
-# service account in between), so this needs nothing foundation creates, and
-# the grant lives here with the app's project rather than anywhere CI applies.
+# Each app's deploy identity (main.apps.tf) reaches its own prefix and nothing
+# else. The grant lives here, applied by a person, so nothing CI applies can
+# widen access to state.
 resource "google_storage_bucket_iam_member" "consumer_state" {
   provider = google.platform
-  for_each = var.state_consumers
+  for_each = var.apps
 
   bucket = google_storage_bucket.tfstate.name
   role   = "roles/storage.objectAdmin"
-  member = "principal://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/subject/${each.value.subject}"
+  member = google_service_account.app_deploy[each.key].member
 
   condition {
     title       = "${each.key} state only"
@@ -70,9 +69,9 @@ resource "google_storage_bucket_iam_member" "consumer_state" {
 # object names, not contents.
 resource "google_storage_bucket_iam_member" "consumer_state_list" {
   provider = google.platform
-  for_each = var.state_consumers
+  for_each = var.apps
 
   bucket = google_storage_bucket.tfstate.name
   role   = "roles/storage.legacyBucketReader"
-  member = "principal://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/subject/${each.value.subject}"
+  member = google_service_account.app_deploy[each.key].member
 }

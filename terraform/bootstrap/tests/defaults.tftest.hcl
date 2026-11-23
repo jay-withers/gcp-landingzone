@@ -29,6 +29,17 @@ mock_provider "google" {
   }
 }
 
+# Mocked service accounts all take the platform alias' defaults above, so
+# health's deploy identity is set to look like its own.
+override_resource {
+  target = google_service_account.app_deploy["health"]
+  values = {
+    email  = "health-deploy@jaywithers-health-dev.iam.gserviceaccount.com"
+    member = "serviceAccount:health-deploy@jaywithers-health-dev.iam.gserviceaccount.com"
+    name   = "projects/jaywithers-health-dev/serviceAccounts/health-deploy@jaywithers-health-dev.iam.gserviceaccount.com"
+  }
+}
+
 # main.tf imports the platform project, and a mock provider cannot import.
 override_resource {
   target = google_project.this["platform"]
@@ -130,8 +141,18 @@ run "pipeline" {
   }
 }
 
-run "state_consumers" {
+run "apps" {
   command = apply
+
+  assert {
+    condition     = google_service_account.app_deploy["health"].project == "jaywithers-health-dev" && google_service_account.app_deploy["health"].account_id == "health-deploy"
+    error_message = "health's deploy identity lives in its own project."
+  }
+
+  assert {
+    condition     = endswith(google_service_account_iam_member.app_deploy_federation["health"].member, "/subject/repo:jay-withers@288264678/health@1377247331:environment:dev")
+    error_message = "health's deploy identity trusts its dev environment's subject alone."
+  }
 
   assert {
     condition     = google_storage_bucket_iam_member.consumer_state["health"].condition[0].expression == "resource.name.startsWith(\"projects/_/buckets/jaywithers-tfstate/objects/health/\")"
@@ -139,8 +160,23 @@ run "state_consumers" {
   }
 
   assert {
-    condition     = endswith(google_storage_bucket_iam_member.consumer_state["health"].member, "/subject/repo:jay-withers@288264678/health@1377247331:environment:dev")
-    error_message = "health's state grant names its dev environment's subject."
+    condition     = google_storage_bucket_iam_member.consumer_state["health"].member == "serviceAccount:health-deploy@jaywithers-health-dev.iam.gserviceaccount.com"
+    error_message = "health's state grant goes to its deploy identity."
+  }
+
+  assert {
+    condition     = alltrue([for k, g in google_project_iam_member.app_deploy : g.project == "jaywithers-health-dev"])
+    error_message = "An app's deploy identity holds roles on its own project only."
+  }
+
+  assert {
+    condition     = !anytrue([for k, g in google_project_iam_member.app_deploy : contains(["roles/owner", "roles/editor", "roles/resourcemanager.projectIamAdmin"], g.role)])
+    error_message = "An app's deploy identity never holds owner, editor or project IAM admin."
+  }
+
+  assert {
+    condition     = google_iam_deny_policy.no_bucket_delete["health"].rules[0].deny_rule[0].denied_permissions == tolist(["storage.googleapis.com/buckets.delete"])
+    error_message = "Buckets in an app project can't be deleted while the deny policy stands."
   }
 }
 
@@ -161,12 +197,29 @@ run "bootstrap_prefix_is_reserved" {
   command = plan
 
   variables {
-    state_consumers = {
+    apps = {
       bootstrap = {
+        project = "health"
         subject = "repo:jay-withers@288264678/some-repo@1:environment:dev"
       }
     }
   }
 
-  expect_failures = [var.state_consumers]
+  expect_failures = [var.apps]
+}
+
+# An app belongs in an app project, never the platform one.
+run "app_not_in_platform" {
+  command = plan
+
+  variables {
+    apps = {
+      someapp = {
+        project = "platform"
+        subject = "repo:jay-withers@288264678/some-repo@1:environment:dev"
+      }
+    }
+  }
+
+  expect_failures = [var.apps]
 }

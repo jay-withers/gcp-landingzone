@@ -14,7 +14,7 @@ through `cd-terraform`, once the shared workflows can sign in to GCP.
 
 | Component | Owns | Standing cost |
 | --------- | ---- | ------------- |
-| [`bootstrap`](terraform/bootstrap/) | Org policies, the `apps` folder, the `platform` and app projects with their APIs, the state bucket, the GitHub identity pool, this repo's apply identity, the monthly budget. Its own state is in that bucket | cents/month |
+| [`bootstrap`](terraform/bootstrap/) | Org policies, the `apps` folder, the `platform` and app projects with their APIs, the state bucket, the GitHub identity pool, this repo's apply identity, each app's deploy identity and its project's no-bucket-delete deny policy, the monthly budget. Its own state is in that bucket | cents/month |
 
 ## Organization
 
@@ -85,7 +85,8 @@ ORG=668995077740
 ME=$(gcloud config get-value account)
 for role in roles/resourcemanager.folderAdmin \
             roles/resourcemanager.projectCreator \
-            roles/orgpolicy.policyAdmin; do
+            roles/orgpolicy.policyAdmin \
+            roles/iam.denyAdmin; do
   gcloud organizations add-iam-policy-binding "$ORG" \
     --member="user:$ME" --role="$role" --condition=None
 done

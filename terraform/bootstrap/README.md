@@ -13,9 +13,8 @@ exists, and no pipeline can sign in until its identity pool does.
   network, and has `deletion_policy = "PREVENT"`.
 - **State** (`main.state.tf`): `jaywithers-tfstate`, versioned, with 30-day
   soft delete and `prevent_destroy`. One prefix per repo, as follows:
-  - Each app in `state_consumers` gets object access under its own prefix,
-    granted to its GitHub environment's identity directly, with no service
-    account.
+  - Each app in `apps` gets object access under its own prefix, granted to
+    its deploy identity.
   - Listing object names is bucket-wide, because GCS checks list against the
     bucket.
   - The pipeline identity gets `gcp-landingzone/` and no rights over the
@@ -25,6 +24,12 @@ exists, and no pipeline can sign in until its identity pool does.
 - **Pipeline identity** (`main.pipeline.tf`): `gcp-landingzone-apply`, bound to
   this repo's `apply` environment. Its roles are limited to the `apps` folder,
   the platform project and the state bucket.
+- **App deploy identities** (`main.apps.tf`): for each entry in `apps`, a
+  `<app>-deploy` service account in its project, bound to its repo's GitHub
+  environment alone, with the roles its Terraform and deploy need on that
+  project (`local.app_deploy_roles`) and its state prefix. Plus a deny policy
+  on each app project that stops anyone deleting a bucket there: the store
+  of record's lock.
 - **Budget** (`main.budget.tf`).
 
 Its own state is in the bucket it creates, under `bootstrap/`, where the
@@ -92,15 +97,19 @@ No modules.
 | [google_billing_budget.monthly](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/billing_budget) | resource |
 | [google_folder.apps](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/folder) | resource |
 | [google_folder_iam_member.pipeline](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/folder_iam_member) | resource |
+| [google_iam_deny_policy.no_bucket_delete](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/iam_deny_policy) | resource |
 | [google_iam_workload_identity_pool.github](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/iam_workload_identity_pool) | resource |
 | [google_iam_workload_identity_pool_provider.github](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/iam_workload_identity_pool_provider) | resource |
 | [google_org_policy_policy.org](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/org_policy_policy) | resource |
 | [google_org_policy_policy.public_invoker](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/org_policy_policy) | resource |
 | [google_project.this](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/project) | resource |
+| [google_project_iam_member.app_deploy](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/project_iam_member) | resource |
 | [google_project_iam_member.pipeline_apps](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/project_iam_member) | resource |
 | [google_project_iam_member.pipeline_platform](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/project_iam_member) | resource |
 | [google_project_service.this](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/project_service) | resource |
+| [google_service_account.app_deploy](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/service_account) | resource |
 | [google_service_account.pipeline](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/service_account) | resource |
+| [google_service_account_iam_member.app_deploy_federation](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/service_account_iam_member) | resource |
 | [google_service_account_iam_member.pipeline_federation](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/service_account_iam_member) | resource |
 | [google_storage_bucket.tfstate](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/storage_bucket) | resource |
 | [google_storage_bucket_iam_member.consumer_state](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/storage_bucket_iam_member) | resource |
@@ -114,6 +123,7 @@ No modules.
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_allowed_locations"></a> [allowed\_locations](#input\_allowed\_locations) | gcp.resourceLocations' allowed values. Global resources (IAM, the identity pool, budgets) are not subject to it. | `list(string)` | <pre>[<br/>  "in:europe-west1-locations"<br/>]</pre> | no |
+| <a name="input_apps"></a> [apps](#input\_apps) | Each app deployed from its own repo's pipeline, keyed by the app's name,<br/>which is also its state prefix (`prefix = "<key>/<env>"` in its gcs<br/>backend). `project` is its key in var.projects (an app project, in the<br/>apps folder). `subject` is the GitHub environment its pipeline plans,<br/>applies and deploys in, immutable form:<br/>`repo:jay-withers@<owner id>/<repo>@<repo id>:environment:<env>`.<br/><br/>Each gets a `<key>-deploy` service account in its project, federated to<br/>that subject alone, holding local.app\_deploy\_roles on the project and its<br/>state prefix; and its project gets the deny policy against bucket<br/>deletion (main.apps.tf). | <pre>map(object({<br/>    project = string<br/>    subject = string<br/>  }))</pre> | `{}` | no |
 | <a name="input_billing_account"></a> [billing\_account](#input\_billing\_account) | Billing account every project is linked to, and the budget watches. | `string` | n/a | yes |
 | <a name="input_budget_amount"></a> [budget\_amount](#input\_budget\_amount) | Monthly budget, in the billing account's own currency. Alerts at 50% and 100% of actual spend, and at 100% forecast. | `number` | `5` | no |
 | <a name="input_github_owner_id"></a> [github\_owner\_id](#input\_github\_owner\_id) | GitHub's numeric ID for the jay-withers account. The pool trusts tokens from this owner only. | `string` | n/a | yes |
@@ -125,12 +135,12 @@ No modules.
 | <a name="input_public_invoker_projects"></a> [public\_invoker\_projects](#input\_public\_invoker\_projects) | Keys of projects exempt from iam.allowedPolicyMemberDomains, so a Cloud Run service there can grant allUsers the invoker role. health's passcode gate is its front door, not IAM. | `set(string)` | `[]` | no |
 | <a name="input_region"></a> [region](#input\_region) | The one region anything is created in. europe-west1 because Cloud Run domain mappings exist there and not in europe-west2. | `string` | `"europe-west1"` | no |
 | <a name="input_state_bucket_name"></a> [state\_bucket\_name](#input\_state\_bucket\_name) | The Terraform state bucket. Bucket names are global. Also written as a literal in versions.tf's backend block, which can't read variables: change both together. | `string` | n/a | yes |
-| <a name="input_state_consumers"></a> [state\_consumers](#input\_state\_consumers) | Repos that keep Terraform state in the bucket, keyed by the prefix their<br/>backend uses (`prefix = "<key>/<env>"`). `subject` is the GitHub<br/>environment their pipeline plans and applies in, immutable form:<br/>`repo:jay-withers@<owner id>/<repo>@<repo id>:environment:<env>`. | <pre>map(object({<br/>    subject = string<br/>  }))</pre> | `{}` | no |
 
 ## Outputs
 
 | Name | Description |
 | ---- | ----------- |
+| <a name="output_app_deploy_service_accounts"></a> [app\_deploy\_service\_accounts](#output\_app\_deploy\_service\_accounts) | Each app's deploy identity, for GCP\_SERVICE\_ACCOUNT on its GitHub environment (github-repos), and to add as a Search Console owner of a custom domain. |
 | <a name="output_apps_folder"></a> [apps\_folder](#output\_apps\_folder) | The apps folder (`folders/<id>`), where the pipeline identity's grants stop. |
 | <a name="output_org_id"></a> [org\_id](#output\_org\_id) | The organization's numeric ID. |
 | <a name="output_pipeline_service_account"></a> [pipeline\_service\_account](#output\_pipeline\_service\_account) | This repo's apply identity (GCP\_SERVICE\_ACCOUNT on its `apply` environment). |
