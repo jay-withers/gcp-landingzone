@@ -34,8 +34,9 @@ the why and the first apply.
   apply can remove or re-scope the identity it runs as. Don't add a backend.
 - **The pipeline identity never gets organization-level roles.** Org policy,
   folders, projects and billing stay with a person. Its grants stop at the
-  `apps` folder, the platform project, and its own `gcp-landingzone/` state
-  prefix. It holds no right over the bucket or its IAM. That's why each app's
+  `apps` folder, each app project (only for roles GCP refuses on a folder,
+  such as `roles/iam.roleAdmin`), the platform project, and its own
+  `gcp-landingzone/` state prefix. It holds no right over the bucket or its IAM. That's why each app's
   state grant (`state_consumers`, by prefix, to the GitHub identity
   directly) is made here by hand. A new grant for it is a decision for the
   user, not a fix for a permission error.

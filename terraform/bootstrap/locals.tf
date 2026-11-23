@@ -61,11 +61,23 @@ locals {
   # billing stay with whoever applies bootstrap by hand.
   pipeline_folder_roles = toset([
     "roles/browser",
-    "roles/iam.roleAdmin",
     "roles/iam.serviceAccountAdmin",
     "roles/resourcemanager.projectIamAdmin",
     "roles/serviceusage.serviceUsageConsumer",
   ])
+
+  # Roles GCP will not take on a folder, granted on each app project instead.
+  # roles/iam.roleAdmin: custom roles live in projects (and organizations),
+  # never folders, and foundation creates one per app (storage without
+  # bucket delete).
+  pipeline_app_project_roles = merge([
+    for key, p in var.projects : {
+      for role in ["roles/iam.roleAdmin"] : "${key}/${role}" => {
+        project = key
+        role    = role
+      }
+    } if p.in_apps_folder
+  ]...)
 
   pipeline_platform_roles = toset([
     "roles/artifactregistry.admin",
