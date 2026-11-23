@@ -10,9 +10,8 @@
 # environment's subject, which github-repos restricts to main. Pull requests
 # get no credentialled plan.
 #
-# Its rights stop at the apps folder, each app project (for the one role GCP
-# refuses on a folder: see local.pipeline_app_project_roles), the platform
-# project and its own state prefix. It cannot touch org policy, create projects or folders, link billing,
+# Its rights stop at reading the apps folder, the platform project (for
+# foundation's Artifact Registry proxy) and its own state prefix. It cannot touch org policy, create projects or folders, link billing,
 # or change who can read state.
 resource "google_service_account" "pipeline" {
   provider = google.platform
@@ -34,26 +33,12 @@ resource "google_service_account_iam_member" "pipeline_federation" {
 }
 
 resource "google_folder_iam_member" "pipeline" {
-  # checkov:skip=CKV_GCP_44: serviceAccountAdmin on the apps folder is how
-  #   foundation creates each app's deploy identity and binds it to that
-  #   app's GitHub environment. It is the apply identity, the deliberate
-  #   exception to targeted grants, as in azure-landingzone; it stops at the
-  #   folder, so the platform project's own identities stay out of reach.
   provider = google.platform
   for_each = local.pipeline_folder_roles
 
   folder = google_folder.apps.name
   role   = each.key
   member = google_service_account.pipeline.member
-}
-
-resource "google_project_iam_member" "pipeline_apps" {
-  provider = google.platform
-  for_each = local.pipeline_app_project_roles
-
-  project = google_project.this[each.value.project].project_id
-  role    = each.value.role
-  member  = google_service_account.pipeline.member
 }
 
 resource "google_project_iam_member" "pipeline_platform" {

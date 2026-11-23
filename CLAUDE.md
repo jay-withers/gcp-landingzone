@@ -25,7 +25,9 @@ the why and the first apply.
   pre-commit there.
 - Tests mock the google provider. Mocks generate random strings, and IAM
   members are validated even against a mock, so a test that applies sets
-  realistic `mock_resource` defaults (see `bootstrap/tests`).
+  realistic `mock_resource` defaults (see `bootstrap/tests`). To give one
+  instance different values, use a **file-level** `override_resource`: one
+  inside a `run` block didn't reach other resources' references to it.
 
 ## bootstrap: keep these true
 
@@ -38,13 +40,25 @@ the why and the first apply.
   organization applies with a gitignored `backend_override.tf` forcing local
   state, then `terraform init -migrate-state`.
 - **The pipeline identity never gets organization-level roles.** Org policy,
-  folders, projects and billing stay with a person. Its grants stop at the
-  `apps` folder, each app project (only for roles GCP refuses on a folder,
-  such as `roles/iam.roleAdmin`), the platform project, and its own
-  `gcp-landingzone/` state prefix. It holds no right over the bucket or its IAM. That's why each app's
-  state grant (`state_consumers`, by prefix, to the GitHub identity
-  directly) is made here by hand. A new grant for it is a decision for the
-  user, not a fix for a permission error.
+  folders, projects and billing stay with a person. It can read the `apps`
+  folder, run the platform project's Artifact Registry, and write its own
+  `gcp-landingzone/` state prefix: nothing that creates, binds or grants to
+  an identity, so no CI apply can reach an app's deploy identity or state.
+  A new grant for it is a decision for the user, not a fix for a permission
+  error.
+- **Each app's deploy identity is here too** (`apps`, `main.apps.tf`), not in
+  a pipeline-applied component: it's privileged, and it holds the app's
+  state prefix. A service account (not the bare GitHub principal) because a
+  Cloud Run domain mapping's creator must be a Search Console owner, and only
+  an email can be one. Its roles (`local.app_deploy_roles`) stop at its own
+  project and never include owner, editor, project IAM admin or
+  `serviceAccountAdmin`: its runtime accounts come from a custom role without
+  `setIamPolicy`, so it can't widen any account's trust, its own included.
+- **Stores of record are protected by an IAM deny policy, not a role gap.**
+  `no-bucket-delete` on every app project denies `buckets.delete` to
+  everyone, owners included, so an identity that can grant itself
+  storage.admin still can't delete one. To delete a bucket, a person removes
+  the policy here first. Applying it needs `roles/iam.denyAdmin`.
 - **The domain restriction (`iam.allowedPolicyMemberDomains`) is lifted per
   project, never for the organization.** A project is exempt only if it's in
   `public_invoker_projects`, because it serves a public Cloud Run service.
@@ -62,7 +76,7 @@ the why and the first apply.
 ## Not here yet
 
 - `foundation` (applied through cd-terraform) will hold the ghcr.io Artifact
-  Registry proxy and each app's deploy identity.
+  Registry proxy and its readers.
 - cd-terraform, schedule-drift and manual-terraform-unlock were removed from
   the template's set, because the shared `terraform-deploy.yml` signs in to
   Azure only. They return once it has a GCP path and github-repos gives this

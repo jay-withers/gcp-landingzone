@@ -64,9 +64,11 @@ pipeline_identity = {
 
 state_bucket_name = "jaywithers-tfstate"
 
-# health's pipeline plans and applies in its `dev` GitHub environment.
-state_consumers = {
+# Apps on GCP, each deployed by its own repo's pipeline. health's plans,
+# applies and deploys all run in its `dev` GitHub environment.
+apps = {
   health = {
+    project = "health"
     subject = "repo:jay-withers@288264678/health@1377247331:environment:dev"
   }
 }

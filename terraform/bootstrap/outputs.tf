@@ -37,3 +37,8 @@ output "pipeline_service_account" {
   description = "This repo's apply identity (GCP_SERVICE_ACCOUNT on its `apply` environment)."
   value       = google_service_account.pipeline.email
 }
+
+output "app_deploy_service_accounts" {
+  description = "Each app's deploy identity, for GCP_SERVICE_ACCOUNT on its GitHub environment (github-repos), and to add as a Search Console owner of a custom domain."
+  value       = { for k, sa in google_service_account.app_deploy : k => sa.email }
+}
