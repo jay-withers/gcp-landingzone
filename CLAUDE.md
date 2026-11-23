@@ -29,9 +29,14 @@ the why and the first apply.
 
 ## bootstrap: keep these true
 
-- **It is never applied from CI.** Its state is local, by decision, as in
-  azure-landingzone. That's why the pipeline identity lives here: no pipeline
-  apply can remove or re-scope the identity it runs as. Don't add a backend.
+- **It is never applied from CI.** That's why the pipeline identity lives
+  here: no pipeline apply can remove or re-scope the identity it runs as.
+- **Its state is in the bucket it creates, under `bootstrap/`**, deliberately
+  unlike azure-landingzone's local state (decided 2026-11-23). The bucket's
+  `prevent_destroy` and soft delete cover the destroy-deletes-its-own-state
+  risk. Never put it under `gcp-landingzone/`, the pipeline's prefix. A fresh
+  organization applies with a gitignored `backend_override.tf` forcing local
+  state, then `terraform init -migrate-state`.
 - **The pipeline identity never gets organization-level roles.** Org policy,
   folders, projects and billing stay with a person. Its grants stop at the
   `apps` folder, each app project (only for roles GCP refuses on a folder,

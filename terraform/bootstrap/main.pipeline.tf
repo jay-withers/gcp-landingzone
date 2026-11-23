@@ -1,9 +1,9 @@
 # This repo's own CI apply identity: what cd-terraform will sign in as for
 # every component except this one.
 #
-# Created here, in bootstrap, because bootstrap is never applied from CI (its
-# state is local, by decision), so no pipeline apply can delete, re-bind or
-# re-scope the identity it runs as. The same reasoning as azure-landingzone's
+# Created here, in bootstrap, because bootstrap is never applied from CI (and
+# its state, under bootstrap/, is outside this identity's prefix grant), so no
+# pipeline apply can delete, re-bind or re-scope the identity it runs as. The same reasoning as azure-landingzone's
 # uai-azure-landingzone-apply-dev.
 #
 # What keeps it to merged code: the binding trusts only the `apply` GitHub

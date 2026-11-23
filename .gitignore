@@ -1,10 +1,9 @@
 # Local .terraform directories
 **/.terraform/*
 
-# .tfstate files. Every component keeps state in the gcs backend except
-# bootstrap, which creates that bucket and so keeps its own locally - see
-# terraform/bootstrap/README.md. Never commit it; it is recoverable by import,
-# not by git.
+# .tfstate files. Every component keeps state in the gcs backend; bootstrap
+# only holds local state during a fresh organization's first apply, before
+# its bucket exists (see the README's "Manual steps"). Never commit it.
 *.tfstate
 *.tfstate.*
 

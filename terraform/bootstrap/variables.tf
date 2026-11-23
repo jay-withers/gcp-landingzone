@@ -120,14 +120,14 @@ variable "state_consumers" {
   }
 
   validation {
-    condition     = !contains(keys(var.state_consumers), "gcp-landingzone")
-    error_message = "gcp-landingzone's own prefix is its apply identity's (main.pipeline.tf)."
+    condition     = length(setintersection(keys(var.state_consumers), ["gcp-landingzone", "bootstrap"])) == 0
+    error_message = "gcp-landingzone/ is its apply identity's prefix (main.pipeline.tf), and bootstrap/ is bootstrap's own state, which only a person may reach."
   }
 }
 
 variable "state_bucket_name" {
   type        = string
-  description = "The Terraform state bucket. Bucket names are global."
+  description = "The Terraform state bucket. Bucket names are global. Also written as a literal in versions.tf's backend block, which can't read variables: change both together."
 }
 
 variable "budget_amount" {

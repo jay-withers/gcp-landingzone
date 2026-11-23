@@ -14,7 +14,7 @@ through `cd-terraform`, once the shared workflows can sign in to GCP.
 
 | Component | Owns | Standing cost |
 | --------- | ---- | ------------- |
-| [`bootstrap`](terraform/bootstrap/) | Org policies, the `apps` folder, the `platform` and app projects with their APIs, the state bucket, the GitHub identity pool, this repo's apply identity, the monthly budget. Its own state is local | cents/month |
+| [`bootstrap`](terraform/bootstrap/) | Org policies, the `apps` folder, the `platform` and app projects with their APIs, the state bucket, the GitHub identity pool, this repo's apply identity, the monthly budget. Its own state is in that bucket | cents/month |
 
 ## Organization
 
@@ -124,21 +124,26 @@ Every constraint bootstrap manages that appears there goes in
 exact name listed. Some are managed constraints (`iam.managed.*`). A name
 bootstrap doesn't manage fails validation at plan time.
 
-### 5. Apply bootstrap, from a clone of your own
+### 5. Apply bootstrap, then move its state into the bucket
 
-Bootstrap's state is local, so apply it from a clone you keep, not from
-factory's `repos/` mirror:
+Its backend is the state bucket it creates, which doesn't exist yet on a
+fresh organization. So the first apply runs on local state, forced by an
+override file (`*_override.tf` is gitignored), and then migrates:
 
 ```bash
 git clone https://github.com/jay-withers/gcp-landingzone.git ~/git/gcp-landingzone
-cd ~/git/gcp-landingzone
-make apply C=bootstrap
+cd ~/git/gcp-landingzone/terraform/bootstrap
+printf 'terraform {\n  backend "local" {}\n}\n' > backend_override.tf
+terraform init && terraform apply
+rm backend_override.tf
+terraform init -migrate-state   # answer yes: copies the local state to gs://jaywithers-tfstate/bootstrap/
+terraform plan                  # no changes
+rm -f terraform.tfstate terraform.tfstate.backup
 ```
 
-Keep a copy of `terraform/bootstrap/terraform.tfstate` outside the machine,
-and refresh it after every bootstrap apply. Every name in it is
-deterministic, so a lost copy means `terraform import`, but a copy saves
-that.
+After that, `make plan C=bootstrap` and `make apply C=bootstrap` work from any
+clone with gcloud application default credentials. Here this happened on
+2026-11-23, after the first apply had run on local state.
 
 ### 6. After the first apply
 
